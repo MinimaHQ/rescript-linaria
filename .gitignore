@@ -7,4 +7,4 @@ lib/
 _esy
 _build
 .linaria-cache
-rescript-linaria.install
+rescript-linaria-ppx.install

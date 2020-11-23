@@ -1,5 +1,5 @@
 (executable
   (name bin)
-  (public_name rescript-linaria)
-  (libraries rescript-linaria.lib)
+  (public_name rescript-linaria-ppx)
+  (libraries rescript-linaria-ppx.lib)
 )
