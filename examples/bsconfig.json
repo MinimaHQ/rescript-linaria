@@ -1,0 +1,26 @@
+{
+  "name": "rescript-linaria-examples",
+  "sources": [
+    "src"
+  ],
+  "bs-dependencies": [
+    "reason-react",
+    "re-classnames"
+  ],
+  "refmt": 3,
+  "reason": {
+    "react-jsx": 3
+  },
+  "bsc-flags": ["-open Belt"],
+  "ppx-flags": [
+    "../_build/default/bin/bin.exe"
+  ],
+  "suffix": ".bs.js",
+  "package-specs": {
+    "module": "es6",
+    "in-source": true
+  },
+  "warnings": {
+    "number": "+A-40-42-44"
+  }
+}

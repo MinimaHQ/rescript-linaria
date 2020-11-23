@@ -1,0 +1,10 @@
+node_modules/
+lib/
+.merlin
+.bsb.lock
+*.bs.js
+.DS_Store
+_esy
+_build
+.linaria-cache
+rescript-linaria.install

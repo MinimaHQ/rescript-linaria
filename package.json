@@ -1,0 +1,21 @@
+{
+  "name": "rescript-linaria",
+  "version": "0.0.0",
+  "description": "ReScript bindings to Linaria",
+  "author": "Alex Fedoseev <alex.fedoseev@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MinimaHQ/rescript-linaria.git"
+  },
+  "keywords": [
+    "rescript",
+    "linaria",
+    "react",
+    "reason-react",
+    "reason",
+    "reasonml",
+    "ocaml",
+    "bucklescript"
+  ]
+}

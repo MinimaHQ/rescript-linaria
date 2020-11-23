@@ -1,0 +1,20 @@
+{
+  "name": "rescript-linaria",
+  "version": "0.0.0",
+  "author": "Alex Fedoseev <alex.fedoseev@gmail.com>",
+  "license": "MIT",
+  "esy": {
+    "build": "dune build -p #{self.name}",
+    "buildsInSource": "_build"
+  },
+  "dependencies": {
+    "@esy-ocaml/reason": "*",
+    "@opam/dune": "^2.7.1",
+    "@opam/ppxlib": "^0.20.0",
+    "ocaml": "~4.6.1000",
+    "refmterr": "*"
+  },
+  "devDependencies": {
+    "@opam/merlin": "*"
+  }
+}
