@@ -1,10 +1,10 @@
 {
   "checksum": "7dcaa3efbabea5519137f5fbd286e94d",
-  "root": "rescript-linaria@link-dev:./esy.json",
+  "root": "rescript-linaria-ppx@link-dev:./esy.json",
   "node": {
-    "rescript-linaria@link-dev:./esy.json": {
-      "id": "rescript-linaria@link-dev:./esy.json",
-      "name": "rescript-linaria",
+    "rescript-linaria-ppx@link-dev:./esy.json": {
+      "id": "rescript-linaria-ppx@link-dev:./esy.json",
+      "name": "rescript-linaria-ppx",
       "version": "link-dev:./esy.json",
       "source": { "type": "link-dev", "path": ".", "manifest": "esy.json" },
       "overrides": [],
