@@ -75,11 +75,18 @@ let join_loc = (loc1, loc2) => {
   };
 };
 
-let parse_lid = (lid: longident) => {
+let parse_lid = (~submodule, lid: longident) => {
   let parts = lid |> Longident.flatten_exn;
   switch (parts) {
   | [] => ParsedData.empty
-  | [x] => {ParsedData.css: x, modules: ExternalModuleSet.empty}
+  | [x] => {
+      ParsedData.css:
+        switch (submodule) {
+        | None => x
+        | Some(submodule) => submodule ++ "." ++ x
+        },
+      modules: ExternalModuleSet.empty,
+    }
   | [hd, ...tl] => {
       ParsedData.css: tl |> List.fold_left((acc, x) => acc ++ "." ++ x, hd),
       modules: hd |> ExternalModuleSet.singleton,
@@ -87,27 +94,30 @@ let parse_lid = (lid: longident) => {
   };
 };
 
-let rec parse_function = (~args: list((arg_label, expression)), ~loc, lid) => {
-  let fn_lid = lid.txt |> parse_lid;
-  switch (fn_lid.css) {
-  | "|." => fn_lid |> parse_pipe_function(~data=`first, ~args, ~loc)
-  | "|>" => fn_lid |> parse_pipe_function(~data=`last, ~args, ~loc)
-  | _ => fn_lid |> parse_general_function(~args)
+let rec parse_function =
+        (~args: list((arg_label, expression)), ~submodule, ~loc, lid) => {
+  switch (lid.txt) {
+  | Lident("|.") => parse_pipe_function(~args, ~data=`first, ~submodule, ~loc)
+  | Lident("|>") => parse_pipe_function(~args, ~data=`last, ~submodule, ~loc)
+  | _ as lid =>
+    lid |> parse_lid(~submodule) |> parse_general_function(~args, ~submodule)
   };
 }
 and parse_pipe_function =
     (
-      ~data: [ | `first | `last],
       ~args: list((arg_label, expression)),
+      ~data: [ | `first | `last],
+      ~submodule: option(string),
       ~loc: location,
-      lid: ParsedData.t,
     ) => {
   switch (args) {
   | [
       (Nolabel, _) as l_arg,
       (Nolabel, {pexp_desc: Pexp_ident({txt: r_lid})}),
     ] =>
-    r_lid |> parse_lid |> parse_general_function(~args=[l_arg])
+    r_lid
+    |> parse_lid(~submodule)
+    |> parse_general_function(~args=[l_arg], ~submodule)
 
   | [
       (Nolabel, _) as l_arg,
@@ -120,13 +130,14 @@ and parse_pipe_function =
       ),
     ] =>
     r_lid
-    |> parse_lid
+    |> parse_lid(~submodule)
     |> parse_general_function(
          ~args=
            switch (data) {
            | `first => [l_arg, ...r_args]
            | `last => List.append(r_args, [l_arg])
            },
+         ~submodule,
        )
 
   | [
@@ -145,7 +156,11 @@ and parse_pipe_function =
   };
 }
 and parse_general_function =
-    (~args: list((arg_label, expression)), lid: ParsedData.t) => {
+    (
+      ~args: list((arg_label, expression)),
+      ~submodule: option(string),
+      lid: ParsedData.t,
+    ) => {
   switch (args) {
   | [(Nolabel, {pexp_desc: Pexp_construct({txt: Lident("()")}, _)})] =>
     Ok({ParsedData.css: lid.css ++ "()", modules: lid.modules})
@@ -158,7 +173,7 @@ and parse_general_function =
                 switch (arg) {
                 | (Nolabel, expr) =>
                   expr
-                  |> js_arg_from_expr
+                  |> js_arg_from_expr(~submodule)
                   |> Result.map((arg: ParsedData.t) =>
                        {
                          ParsedData.css:
@@ -193,15 +208,15 @@ and parse_general_function =
        )
   };
 }
-and js_arg_from_expr = (expr: expression) =>
+and js_arg_from_expr = (~submodule: option(string), expr: expression) =>
   switch (expr) {
-  | {pexp_desc: Pexp_ident({txt: lid})} => Ok(lid |> parse_lid)
+  | {pexp_desc: Pexp_ident({txt: lid})} => Ok(lid |> parse_lid(~submodule))
   | {pexp_desc: Pexp_constant(Pconst_integer(x, _) | Pconst_float(x, _))} =>
     Ok({ParsedData.css: x, modules: ExternalModuleSet.empty})
   | {pexp_desc: Pexp_constant(Pconst_string(x, _, _))} =>
     Ok({ParsedData.css: "\"" ++ x ++ "\"", modules: ExternalModuleSet.empty})
   | {pexp_desc: Pexp_apply({pexp_desc: Pexp_ident(lid)}, args), pexp_loc} =>
-    lid |> parse_function(~args, ~loc=pexp_loc)
+    lid |> parse_function(~args, ~submodule, ~loc=pexp_loc)
   | {pexp_loc} =>
     Error({Error.reason: `UnexpectedInterpolation, loc: pexp_loc})
   };
@@ -211,6 +226,7 @@ let rec concat_js_expression =
           ~op: string,
           ~loc: location,
           ~res: result(ParsedData.t, Error.t),
+          ~submodule: option(string),
           operands: list((arg_label, expression)),
         )
         : result(ParsedData.t, Error.t) => {
@@ -265,12 +281,14 @@ let rec concat_js_expression =
                 ~op=l_op,
                 ~loc=l_apply_loc,
                 ~res=Ok(ParsedData.empty),
+                ~submodule,
               ),
            r_operands
            |> concat_js_expression(
                 ~op=r_op,
                 ~loc=r_apply_loc,
                 ~res=Ok(ParsedData.empty),
+                ~submodule,
               ),
          ) {
          | (Ok(l), Ok(r)) =>
@@ -308,13 +326,14 @@ let rec concat_js_expression =
            (Nolabel, r_expr),
          ] =>
          r_expr
-         |> js_arg_from_expr
+         |> js_arg_from_expr(~submodule)
          |> Result.flatMap((r: ParsedData.t) =>
               l_operands
               |> concat_js_expression(
                    ~op=l_op,
                    ~loc=l_apply_loc,
                    ~res=Ok(ParsedData.empty),
+                   ~submodule,
                  )
               |> Result.flatMap((l: ParsedData.t) =>
                    Ok({
@@ -351,13 +370,14 @@ let rec concat_js_expression =
            ),
          ] =>
          l_expr
-         |> js_arg_from_expr
+         |> js_arg_from_expr(~submodule)
          |> Result.flatMap((l: ParsedData.t) =>
               r_operands
               |> concat_js_expression(
                    ~op=r_op,
                    ~loc=r_apply_loc,
                    ~res=Ok(ParsedData.empty),
+                   ~submodule,
                  )
               |> Result.flatMap((r: ParsedData.t) =>
                    Ok({
@@ -371,7 +391,10 @@ let rec concat_js_expression =
                  )
             )
        | [(Nolabel, l_expr), (Nolabel, r_expr)] =>
-         switch (l_expr |> js_arg_from_expr, r_expr |> js_arg_from_expr) {
+         switch (
+           l_expr |> js_arg_from_expr(~submodule),
+           r_expr |> js_arg_from_expr(~submodule),
+         ) {
          | (Ok(l), Ok(r)) =>
            Ok({
              ParsedData.css: js_infix(~l=l.css, ~op, ~r=r.css) ++ data.css,
@@ -403,6 +426,7 @@ let rec concat_css_block =
         (
           ~loc: location,
           ~res: result(ParsedData.t, Error.t),
+          ~submodule: option(string),
           operands: list((arg_label, expression)),
         ) => {
   res
@@ -430,6 +454,7 @@ let rec concat_css_block =
          ] =>
          l_operands
          |> concat_css_block(
+              ~submodule,
               ~loc=l_apply_loc,
               ~res=
                 Ok({
@@ -452,9 +477,10 @@ let rec concat_css_block =
            ),
            (Nolabel, {pexp_desc: Pexp_ident({txt: r_lid})}),
          ] =>
-         let r_lid = r_lid |> parse_lid;
+         let r_lid = r_lid |> parse_lid(~submodule);
          l_operands
          |> concat_css_block(
+              ~submodule,
               ~loc=l_apply_loc,
               ~res=
                 Ok({
@@ -488,6 +514,7 @@ let rec concat_css_block =
          ] =>
          l_operands
          |> concat_css_block(
+              ~submodule,
               ~loc=l_apply_loc,
               ~res=
                 Ok({
@@ -506,7 +533,7 @@ let rec concat_css_block =
            ),
            (Nolabel, {pexp_desc: Pexp_ident({txt: r_lid})}),
          ] =>
-         let r_lid = r_lid |> parse_lid;
+         let r_lid = r_lid |> parse_lid(~submodule);
          Ok({
            ParsedData.css: l_css ++ js_interpolation(r_lid.css) ++ data.css,
            modules: data.modules |> ExternalModuleSet.concat(r_lid.modules),
@@ -594,10 +621,12 @@ let rec concat_css_block =
               ~op=r_op,
               ~loc=r_exp_loc,
               ~res=Ok(ParsedData.empty),
+              ~submodule,
             )
          |> Result.flatMap((r: ParsedData.t) =>
               l_operands
               |> concat_css_block(
+                   ~submodule,
                    ~loc=l_apply_loc,
                    ~res=Ok(ParsedData.empty),
                  )
@@ -647,6 +676,7 @@ let rec concat_css_block =
               ~op=r_op,
               ~loc=r_exp_loc,
               ~res=Ok(ParsedData.empty),
+              ~submodule,
             )
          |> Result.flatMap((r: ParsedData.t) =>
               Ok({
@@ -673,7 +703,7 @@ let rec concat_css_block =
            ),
          ] =>
          r_lid
-         |> parse_function(~args=r_operands, ~loc=r_exp_loc)
+         |> parse_function(~args=r_operands, ~loc=r_exp_loc, ~submodule)
          |> Result.flatMap((r: ParsedData.t) =>
               Ok({
                 ParsedData.css: l_css ++ js_interpolation(r.css) ++ data.css,
@@ -703,10 +733,11 @@ let rec concat_css_block =
            ),
          ] =>
          r_lid
-         |> parse_function(~args=r_operands, ~loc=r_exp_loc)
+         |> parse_function(~args=r_operands, ~loc=r_exp_loc, ~submodule)
          |> Result.flatMap((r: ParsedData.t) =>
               l_operands
               |> concat_css_block(
+                   ~submodule,
                    ~loc=l_apply_loc,
                    ~res=Ok(ParsedData.empty),
                  )
@@ -738,226 +769,245 @@ let rec concat_css_block =
      );
 };
 
+let generate_module = (~loc, ~submodule, str) => {
+  // This is required import so babel plugin could pickup this module
+  let import = [%stri
+    %raw
+    {|import { css } from "@linaria/core"|}
+  ];
+
+  let (str, modules) =
+    str
+    |> List.rev
+    |> List.fold_left(
+         ((str, modules), item) =>
+           switch (item) {
+           | {
+               pstr_desc:
+                 Pstr_value(
+                   Nonrecursive,
+                   [
+                     {
+                       pvb_pat: {
+                         ppat_desc: Ppat_var(var),
+                         ppat_loc,
+                         ppat_loc_stack,
+                         ppat_attributes,
+                       },
+                       pvb_expr: {
+                         pexp_desc:
+                           Pexp_constant(
+                             Pconst_string(css, _loc, Some("css")),
+                           ),
+                         pexp_loc,
+                         pexp_loc_stack,
+                         pexp_attributes,
+                       },
+                       pvb_attributes,
+                       pvb_loc,
+                     },
+                   ],
+                 ),
+               pstr_loc,
+             } => (
+               [
+                 {
+                   pstr_desc:
+                     Pstr_value(
+                       Nonrecursive,
+                       [
+                         {
+                           pvb_pat: {
+                             ppat_desc: Ppat_var(var),
+                             ppat_loc,
+                             ppat_loc_stack,
+                             ppat_attributes,
+                           },
+                           pvb_expr: {
+                             let loc = pexp_loc;
+                             let typ = [%type: string];
+                             let exp = [%expr
+                               [%raw
+                                 [%e
+                                   Exp.constant(
+                                     Const.string("css`" ++ css ++ "`"),
+                                   )
+                                 ]
+                               ]
+                             ];
+                             Ast_helper.Exp.constraint_(~loc, exp, typ);
+                           },
+                           pvb_attributes,
+                           pvb_loc,
+                         },
+                       ],
+                     ),
+                   pstr_loc,
+                 },
+                 ...str,
+               ],
+               modules,
+             )
+           | {
+               pstr_desc:
+                 Pstr_value(
+                   Nonrecursive,
+                   [
+                     {
+                       pvb_pat: {
+                         ppat_desc: Ppat_var(var),
+                         ppat_loc,
+                         ppat_loc_stack,
+                         ppat_attributes,
+                       },
+                       pvb_expr: {
+                         pexp_desc:
+                           Pexp_apply(
+                             {pexp_desc: Pexp_ident({txt: Lident("^")})},
+                             [
+                               (Nolabel, _),
+                               (
+                                 Nolabel,
+                                 {
+                                   pexp_desc:
+                                     Pexp_constant(
+                                       Pconst_string(_, _, Some("css")),
+                                     ),
+                                 },
+                               ),
+                             ] as css,
+                           ),
+                         pexp_loc,
+                         pexp_loc_stack,
+                         pexp_attributes,
+                       },
+                       pvb_attributes,
+                       pvb_loc,
+                     },
+                   ],
+                 ),
+               pstr_loc,
+             } =>
+             switch (
+               css
+               |> concat_css_block(
+                    ~submodule,
+                    ~loc=pexp_loc,
+                    ~res=Ok(ParsedData.empty),
+                  )
+             ) {
+             | Ok(data) => (
+                 [
+                   {
+                     pstr_desc:
+                       Pstr_value(
+                         Nonrecursive,
+                         [
+                           {
+                             pvb_pat: {
+                               ppat_desc: Ppat_var(var),
+                               ppat_loc,
+                               ppat_loc_stack,
+                               ppat_attributes,
+                             },
+                             pvb_expr: {
+                               let loc = pexp_loc;
+                               let typ = [%type: string];
+                               let exp = [%expr
+                                 [%raw
+                                   [%e
+                                     Exp.constant(
+                                       Const.string(
+                                         "css`" ++ data.css ++ "`",
+                                       ),
+                                     )
+                                   ]
+                                 ]
+                               ];
+                               Ast_helper.Exp.constraint_(~loc, exp, typ);
+                             },
+                             pvb_attributes,
+                             pvb_loc,
+                           },
+                         ],
+                       ),
+                     pstr_loc,
+                   },
+                   ...str,
+                 ],
+                 modules |> ExternalModuleSet.concat(data.modules),
+               )
+             | Error({reason, loc}) =>
+               switch (reason) {
+               | `UnexpectedInterpolation =>
+                 Location.raise_errorf(~loc, "Unexpected interpolation")
+               | `UnexpectedFunction(`LabellledArg) =>
+                 Location.raise_errorf(
+                   ~loc,
+                   "Functions with labelled arguments are not supported",
+                 )
+               | `UnexpectedFunction(`OptionalArg) =>
+                 Location.raise_errorf(
+                   ~loc,
+                   "Functions with optional arguments are not supported",
+                 )
+               | `UnexpectedFunction(`PlaceholderArg) =>
+                 Location.raise_errorf(
+                   ~loc,
+                   "Pipe placeholders are not supported",
+                 )
+               | `UnexpectedFunction(`UnexpectedPipe) =>
+                 Location.raise_errorf(
+                   ~loc,
+                   "Function application with pipe is supported, but I can't parse this combination. Please, file an issue with your use-case.",
+                 )
+               }
+             }
+           | _ as item => ([item, ...str], modules)
+           },
+         ([], ExternalModuleSet.empty),
+       );
+
+  let includes =
+    modules
+    |> ExternalModuleSet.elements
+    |> List.map(m => {
+         Ast_helper.Str.include_(
+           ~loc,
+           Incl.mk(Mod.ident(~loc, {txt: Lident(m), loc})),
+         )
+       });
+
+  Mod.mk(Pmod_structure(str |> List.append([import, ...includes])));
+};
+
+let submodule_from_code_path = path => {
+  switch (path |> Code_path.submodule_path) {
+  | [] => None
+  | _ as s_path => Some(s_path |> List.rev |> List.hd)
+  };
+};
+
 let ext =
-  Extension.declare(
+  Extension.V3.declare(
     "css",
     Extension.Context.module_expr,
     Ast_pattern.__,
-    (~loc, ~path as _, expr) => {
-    switch (expr) {
-    | PStr(str) =>
-      // This is required import so babel plugin could pickup this module
-      let import = [%stri
-        %raw
-        {|import { css } from "@linaria/core"|}
-      ];
+    (~ctxt, payload) => {
+      let loc = ctxt |> Expansion_context.Extension.extension_point_loc;
+      let submodule =
+        ctxt
+        |> Expansion_context.Extension.code_path
+        |> submodule_from_code_path;
 
-      let (str, modules) =
-        str
-        |> List.rev
-        |> List.fold_left(
-             ((str, modules), item) =>
-               switch (item) {
-               | {
-                   pstr_desc:
-                     Pstr_value(
-                       Nonrecursive,
-                       [
-                         {
-                           pvb_pat: {
-                             ppat_desc: Ppat_var(var),
-                             ppat_loc,
-                             ppat_loc_stack,
-                             ppat_attributes,
-                           },
-                           pvb_expr: {
-                             pexp_desc:
-                               Pexp_constant(
-                                 Pconst_string(css, _loc, Some("css")),
-                               ),
-                             pexp_loc,
-                             pexp_loc_stack,
-                             pexp_attributes,
-                           },
-                           pvb_attributes,
-                           pvb_loc,
-                         },
-                       ],
-                     ),
-                   pstr_loc,
-                 } => (
-                   [
-                     {
-                       pstr_desc:
-                         Pstr_value(
-                           Nonrecursive,
-                           [
-                             {
-                               pvb_pat: {
-                                 ppat_desc: Ppat_var(var),
-                                 ppat_loc,
-                                 ppat_loc_stack,
-                                 ppat_attributes,
-                               },
-                               pvb_expr: {
-                                 let loc = pexp_loc;
-                                 let typ = [%type: string];
-                                 let exp = [%expr
-                                   [%raw
-                                     [%e
-                                       Exp.constant(
-                                         Const.string("css`" ++ css ++ "`"),
-                                       )
-                                     ]
-                                   ]
-                                 ];
-                                 Ast_helper.Exp.constraint_(~loc, exp, typ);
-                               },
-                               pvb_attributes,
-                               pvb_loc,
-                             },
-                           ],
-                         ),
-                       pstr_loc,
-                     },
-                     ...str,
-                   ],
-                   modules,
-                 )
-               | {
-                   pstr_desc:
-                     Pstr_value(
-                       Nonrecursive,
-                       [
-                         {
-                           pvb_pat: {
-                             ppat_desc: Ppat_var(var),
-                             ppat_loc,
-                             ppat_loc_stack,
-                             ppat_attributes,
-                           },
-                           pvb_expr: {
-                             pexp_desc:
-                               Pexp_apply(
-                                 {pexp_desc: Pexp_ident({txt: Lident("^")})},
-                                 [
-                                   (Nolabel, _),
-                                   (
-                                     Nolabel,
-                                     {
-                                       pexp_desc:
-                                         Pexp_constant(
-                                           Pconst_string(_, _, Some("css")),
-                                         ),
-                                     },
-                                   ),
-                                 ] as css,
-                               ),
-                             pexp_loc,
-                             pexp_loc_stack,
-                             pexp_attributes,
-                           },
-                           pvb_attributes,
-                           pvb_loc,
-                         },
-                       ],
-                     ),
-                   pstr_loc,
-                 } =>
-                 switch (
-                   css
-                   |> concat_css_block(
-                        ~loc=pexp_loc,
-                        ~res=Ok(ParsedData.empty),
-                      )
-                 ) {
-                 | Ok(data) => (
-                     [
-                       {
-                         pstr_desc:
-                           Pstr_value(
-                             Nonrecursive,
-                             [
-                               {
-                                 pvb_pat: {
-                                   ppat_desc: Ppat_var(var),
-                                   ppat_loc,
-                                   ppat_loc_stack,
-                                   ppat_attributes,
-                                 },
-                                 pvb_expr: {
-                                   let loc = pexp_loc;
-                                   let typ = [%type: string];
-                                   let exp = [%expr
-                                     [%raw
-                                       [%e
-                                         Exp.constant(
-                                           Const.string(
-                                             "css`" ++ data.css ++ "`",
-                                           ),
-                                         )
-                                       ]
-                                     ]
-                                   ];
-                                   Ast_helper.Exp.constraint_(~loc, exp, typ);
-                                 },
-                                 pvb_attributes,
-                                 pvb_loc,
-                               },
-                             ],
-                           ),
-                         pstr_loc,
-                       },
-                       ...str,
-                     ],
-                     modules |> ExternalModuleSet.concat(data.modules),
-                   )
-                 | Error({reason, loc}) =>
-                   switch (reason) {
-                   | `UnexpectedInterpolation =>
-                     Location.raise_errorf(~loc, "Unexpected interpolation")
-                   | `UnexpectedFunction(`LabellledArg) =>
-                     Location.raise_errorf(
-                       ~loc,
-                       "Functions with labelled arguments are not supported",
-                     )
-                   | `UnexpectedFunction(`OptionalArg) =>
-                     Location.raise_errorf(
-                       ~loc,
-                       "Functions with optional arguments are not supported",
-                     )
-                   | `UnexpectedFunction(`PlaceholderArg) =>
-                     Location.raise_errorf(
-                       ~loc,
-                       "Pipe placeholders are not supported",
-                     )
-                   | `UnexpectedFunction(`UnexpectedPipe) =>
-                     Location.raise_errorf(
-                       ~loc,
-                       "Function application with pipe is supported, but I can't parse this combination. Please, file an issue with your use-case.",
-                     )
-                   }
-                 }
-               | _ as item => ([item, ...str], modules)
-               },
-             ([], ExternalModuleSet.empty),
-           );
-
-      let includes =
-        modules
-        |> ExternalModuleSet.elements
-        |> List.map(m => {
-             Ast_helper.Str.include_(
-               ~loc,
-               Incl.mk(Mod.ident(~loc, {txt: Lident(m), loc})),
-             )
-           });
-
-      Mod.mk(Pmod_structure(str |> List.append([import, ...includes])));
-
-    | _ => Location.raise_errorf(~loc, "Must be a module")
-    }
-  });
+      switch (payload) {
+      | PStr(str) => str |> generate_module(~loc, ~submodule)
+      | _ => Location.raise_errorf(~loc, "Must be a module")
+      };
+    },
+  );
 
 "rescript-linaria"
-|> Ppxlib.Driver.register_transformation(~extensions=[ext]);
+|> Ppxlib.Driver.register_transformation(
+     ~rules=[Context_free.Rule.extension(ext)],
+   );

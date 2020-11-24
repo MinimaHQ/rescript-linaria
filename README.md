@@ -6,7 +6,7 @@
 These bindings are unsafe. It means you won't get typed CSS.
 
 What you'll get:
-- Type-safe classnames
+- Type-safe and auto-completable classnames
 - Everything Linaria offers, such as:
   - Static extraction
   - Functions / variables sharing between ReScript and CSS
@@ -40,16 +40,12 @@ See [example](./examples) of its usage with Webpack.
 ### Basic
 
 ```rescript
-// AppStyles.res
-include %css(
+moodule Css = %css(
   let cn = css`
     display: flex;
     position: relative;
   `
 )
-
-// App.res
-module Css = AppStyles
 
 @react.component
 let make = () => <div className=Css.cn />
@@ -60,7 +56,7 @@ let make = () => <div className=Css.cn />
 
 ### Interpolations
 ```rescript
-include %css(
+moodule Css = %css(
   let pad = 5
 
   let cn = css`
@@ -83,29 +79,17 @@ You can't interpolate:
 - other ReScript-only things, such as variants
 
 ### Placement
-It is recommended to place each `%css` module in its own file and use `include`:
+It is required to have exactly 1 `%css` module within 1 ReScript file.
+
+You can place `%css` module either:
+- in `.res` module as a submodule, as shown in the examples above
+- or in its own file using `include`:
 
 ```rescript
 // AppStyles.res
 include %css(
   // your css...
 )
-```
-
-It is possible to place it in a submodule but some things wouldn't work, such as interpolation of local variables.
-
-```rescript
-module Css = %css(
-  let pad = 5
-
-  // It will fail at runtime, unfortunately
-  let cn = css`
-    padding: ${pad}px;
-  `
-)
-
-@react.component
-let make = () => <div className=Css.cn />
 ```
 
 ---
