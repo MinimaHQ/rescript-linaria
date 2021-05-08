@@ -1,0 +1,7 @@
+#!/bin/bash
+
+SRC="./src/AppRe.re"
+PPX="../_build/default/bin/bin.exe"
+REFMT="$(yarn bin)/bsrefmt"
+
+cat $SRC | $REFMT --parse re --print binary | $PPX /dev/stdin /dev/stdout | $REFMT --parse binary --interface false

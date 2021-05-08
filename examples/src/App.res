@@ -30,7 +30,7 @@ module Css = %css(
         background-color: blue;
       }
 
-      @media ${Mq.smallScreen} {
+      @media ${Screen.small} {
         width: ${size - 20}px;
         height: ${size - 20}px;
 
@@ -47,6 +47,10 @@ module Css = %css(
   let font = css`
     font-size: ${10->sum(20)}px;
     font-weight: ${Font.bold};
+  `
+
+  let touchScreen = css`
+    width: ${Screen.Touch.width}px;
   `
 )
 
