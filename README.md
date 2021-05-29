@@ -2,6 +2,9 @@
 
 [ReScript](https://rescript-lang.org) bindings to [Linaria](https://github.com/callstack/linaria).
 
+## Should I use it?
+Most likely, no. After using it on my personal site, I wouldn't recommend it for something more or less critical. This PPX is a big fat hack and it shows.
+
 ## About
 These bindings are unsafe. It means you won't get typed CSS.
 
