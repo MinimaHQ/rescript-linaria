@@ -5,16 +5,16 @@
   "private": true,
   "scripts": {
     "start": "webpack serve",
-    "prestart": "bsb -make-world",
-    "watch": "bsb -clean-world -make-world -w"
+    "prestart": "rescript build",
+    "watch": "rescript build -w"
   },
   "dependencies": {
-    "bs-platform": "8.3.3",
+    "rescript": "9.1.4",
     "polished": "4.0.4",
-    "re-classnames": "5.0.1",
+    "rescript-classnames": "6.0.0",
     "react": "17.0.1",
     "react-dom": "17.0.1",
-    "reason-react": "0.9.1"
+    "@rescript/react": "0.10.3"
   },
   "devDependencies": {
     "@babel/core": "7.12.7",
