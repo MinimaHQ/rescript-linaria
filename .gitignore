@@ -6,5 +6,6 @@ lib/
 .DS_Store
 _esy
 _build
+_release
 .linaria-cache
 rescript-linaria-ppx.install
