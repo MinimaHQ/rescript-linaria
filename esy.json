@@ -1,6 +1,6 @@
 {
   "name": "rescript-linaria-ppx",
-  "version": "0.3.0-beta.1",
+  "version": "0.3.0",
   "author": "Alex Fedoseev <alex@fedoseev.mx>",
   "license": "MIT",
   "esy": {
