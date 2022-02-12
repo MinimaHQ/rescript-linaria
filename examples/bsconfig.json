@@ -4,14 +4,17 @@
     "src"
   ],
   "bs-dependencies": [
-    "reason-react",
-    "re-classnames"
+    "@rescript/react",
+    "rescript-classnames"
   ],
   "refmt": 3,
   "reason": {
     "react-jsx": 3
   },
-  "bsc-flags": ["-open Belt"],
+  "bsc-flags": [
+    "-open Belt",
+    "-open Cx"
+  ],
   "ppx-flags": [
     "../_build/default/bin/bin.exe"
   ],

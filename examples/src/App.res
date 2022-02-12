@@ -14,15 +14,12 @@ module Css = %css(
     justify-content: center;
   `
 
-  let box =
-    css`
+  let box = css`
       margin: ${ten()}px;
       padding: ${pad}px;
       width: ${size->ident}px;
       height: ${size->ident}px;
-      border: 6px solid ${Color.Border.bg->Polished.lighten(
-      0.3,
-    )};
+      border: 6px solid ${Color.Border.bg->Polished.lighten(0.3)};
       background-color: ${Color.bg};
       border-radius: ${Size.md / 2}px;
 
@@ -56,6 +53,6 @@ module Css = %css(
 
 @react.component
 let make = () =>
-  <div className={Css.flex->Cn.append(Css.box)}>
-    <span className={Css.text->Cn.append(Css.font)}> {"ReScript"->React.string} </span>
+  <div className={cx([Css.flex, Css.box])}>
+    <span className={cx([Css.text, Css.font])}> {"ReScript"->React.string} </span>
   </div>

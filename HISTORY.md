@@ -1,5 +1,8 @@
 # History
 
+#### 0.3.0
+- Add native `arm64` binary
+
 #### 0.2.0
 - Handle module names that match names of JS globals (e.g. `Screen`, `Image` etc.)
 

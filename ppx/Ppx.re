@@ -3,7 +3,7 @@ open Ast_helper;
 
 module ExternalModule = {
   type t = string;
-  let compare = Pervasives.compare;
+  let compare = Stdlib.compare;
 };
 
 module ExternalModuleSet = {
@@ -1389,8 +1389,8 @@ let generate_module = (~loc, ~submodule, str) => {
                              Pconst_string(css, _loc, Some("css")),
                            ),
                          pexp_loc,
-                         pexp_loc_stack,
-                         pexp_attributes,
+                         pexp_loc_stack: _,
+                         pexp_attributes: _,
                        },
                        pvb_attributes,
                        pvb_loc,
@@ -1467,8 +1467,8 @@ let generate_module = (~loc, ~submodule, str) => {
                              ] as css,
                            ),
                          pexp_loc,
-                         pexp_loc_stack,
-                         pexp_attributes,
+                         pexp_loc_stack: _,
+                         pexp_attributes: _,
                        },
                        pvb_attributes,
                        pvb_loc,

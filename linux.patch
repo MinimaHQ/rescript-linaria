@@ -1,0 +1,10 @@
+diff --git a/bin/dune b/bin/dune
+index 35f1449..55cef77 100644
+--- a/bin/dune
++++ b/bin/dune
+@@ -2,4 +2,5 @@
+   (name bin)
+   (public_name rescript-linaria-ppx)
+   (libraries rescript-linaria-ppx.lib)
++  (flags (:standard -ccopt -static))
+ )
