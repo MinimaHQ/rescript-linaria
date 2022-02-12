@@ -1,6 +1,6 @@
 {
   "name": "rescript-linaria",
-  "version": "0.2.0",
+  "version": "0.3.0-beta.1",
   "description": "ReScript bindings to Linaria",
   "author": "Alex Fedoseev <alex@fedoseev.mx>",
   "license": "MIT",
